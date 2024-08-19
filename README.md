@@ -1,7 +1,7 @@
 # analytic
 
 ## TypeScript 
-[Подсчёт чаевых]([https://github.com/Saivel1/analytic/blob/main/tips_counter](https://github.com/Saivel1/analytic/blob/main/TypeScript/tips_counter))
+[Подсчёт чаевых](https://github.com/Saivel1/analytic/blob/main/TypeScript/tips_counter)
 
 ## SQL 
 
