@@ -1,0 +1,212 @@
+var ss = SpreadsheetApp.getActiveSpreadsheet();
+var report = ss.getSheetByName('Журнал явки');
+var gerCsv = ss.getSheetByName('Герцена CSV');
+var gerJournal = ss.getSheetByName('Герцена');
+var aDay = 864*100000;
+var hour = 1000*60*60;
+
+
+function shiftsGer (nameOfStuff) { 
+  
+  var stuffShifts = [];  //Дата начала смены | Дата конца смены 
+
+  var stuffList = gerJournal.getRange(1,1,20).getValues(); // Строка с именами 
+  var namesEdge = stuffList.findIndex(name => name == ""); // Индекс первой пустой строки
+
+  var datesList = gerJournal.getRange(1, 1, 1, 35).getValues();
+  var datesListEdge = datesList[0].findIndex(name => name == ""); //Нужен указать для массива, индекс. [0]. В результате индекс первой пустой колонки. Для дат. 
+  
+  var shiftsArray = gerJournal.getRange( 2, 2, namesEdge, datesListEdge - 1).getValues(); // Массив часов. 
+
+  var name = nameOfStuff;
+  
+
+  for (i = 0; i < namesEdge; i++) { 
+
+    if (name == stuffList[i]) {
+
+      for (j = 0; j < shiftsArray[i].length; j++) { 
+
+        if (parseInt(shiftsArray[i - 1][j]) > 0 && shiftsArray != []) { 
+          //stuffShifts.push(shiftsArray[i - 1][j]); массив из только времени 
+          var stringer = shiftsArray[i-1][j].toString(); //Перевод в текстовое значение 
+
+          var start = stringer.slice(0, stringer.indexOf("-"));
+          var end = stringer.slice(stringer.indexOf("-") + 1);
+
+          var startHours = start.slice(0, start.indexOf(":"));
+          var startMinutes = start.slice(start.indexOf(":") + 1);
+
+          var startTime = Number(startHours) + Number(startMinutes)*0.016;
+
+          var endHours = end.slice(0, end.indexOf(":"));
+          var endMinutes = end.slice(end.indexOf(":") + 1);
+
+          var endTime = Number(endHours) + Number(endMinutes)*0.016;
+
+          var date = new Date(datesList[0][j + 1].valueOf() + aDay);
+          
+          stuffShifts.push({dateS: date, startTime: startTime, endTime: endTime});
+          
+        }
+
+      }
+       
+      
+    }
+
+  }
+  
+  return stuffShifts;
+}
+
+function transactionsGer () {
+
+  var tranDatesColumn = gerCsv.getRange(1 , 1, 200).getValues();
+  var anEdge = tranDatesColumn.findIndex(name => name == "") - 1; //Строка последней заполненной ячейки 
+
+  var tranDates = gerCsv.getRange(2, 1, anEdge).getValues();
+
+  var tranTime = gerCsv.getRange(2, 2, anEdge).getValues();
+
+  var tranSum = gerCsv.getRange(2, 4, anEdge).getValues();
+
+  var transaction = []; 
+
+  for (i = 0; i < anEdge; i++) { 
+
+    var date = new Date(tranDates[i][0].valueOf() + aDay);
+    var hours = tranTime[i][0].slice(0, tranTime[i][0].indexOf(':'));
+    var minutes = tranTime[i][0].slice(tranTime[i][0].indexOf(':') + 1);
+
+    var time = Number(hours) + Number(minutes)*0.016;
+
+    //date.setHours(parseInt(hours), parseInt(minutes))
+
+    var sum = Number(tranSum[i][0]);   
+
+
+    transaction.push({date: date, sum: sum, time: time})
+
+  }
+
+  
+  return transaction
+}
+
+function summerGer (collumn, namesEdge) { //Функция по дате счиатеает сумму часов отработанных за смену всех работников. 
+  var fixedArr = [];
+
+  var arrayS = gerJournal.getRange(2, collumn + 2, namesEdge).getValues();
+
+  var summerize = 0;
+
+  for (i = 0; i < arrayS.length; i++) { 
+    
+    if (parseInt(arrayS[i]) > 0) { 
+      
+      var stringer = arrayS[i].toString(); 
+      
+      var first = stringer.slice(0, stringer.indexOf('-'));
+      var second = stringer.slice(stringer.indexOf('-') + 1)
+
+      var hoursF = first.slice(0, first.indexOf(':'));
+      var minutesF = first.slice(first.indexOf(':') + 1);
+
+      var hoursS = second.slice(0, second.indexOf(':'));
+      var minutesS = second.slice(second.indexOf(':') + 1);
+
+      var sum = (hoursS - hoursF + (minutesS - minutesF)*0.016)
+
+      var start = Number(hoursF) + Number(minutesF)*0.016;
+      var end = Number(hoursS) + Number(minutesS)*0.016;
+
+      fixedArr.push({start: start, end: end})
+  
+      summerize += sum;
+
+    }
+
+  }
+
+  fixedArr.push({sum: summerize});
+
+  return fixedArr
+
+}
+
+function chaiGc (nameOfStuff) {
+
+  //var name = "Алексей С.";
+  var sE = gerJournal.getRange(1,1,50).getValues().findIndex(name => name == "") - 1; //ShiftEdge сколько сотрудников в графе Имя, без него. 
+  //var stuffList = gerJournal.getRange(2, 1, sE).getVal
+  
+
+  var shift = shiftsGer(nameOfStuff);
+  var transaction = transactionsGer();
+
+  var eD = gerJournal.getRange(1 , 1, 1, 35).getValues()[0].findIndex(name => name == "") - 1 //edge date Без первой колонны 
+  var dates = gerJournal.getRange(1, 2 ,1, eD).getValues();
+  var datesFixed = [];
+
+  for (i = 0; i < dates[0].length; i++) {
+    var dateTrans = new Date(dates[0][i].valueOf() + aDay).getDate(); 
+    datesFixed.push(dateTrans)
+  }
+  
+
+  //Logger.log(shift[3].date.getDate())
+  var chai = 0;
+  var rent = 0; 
+  for (a = 0; a < shift.length; a++) { //Количество смен, длина массива со сменами. Не называй итераторы одинаковыми буквами. 
+    var sCount = shift[a].dateS.getDate(); //Нужно создавать отдельную переменную, потому что по прямому обращение, после первого взаимодействия, переменная стоновоится Undefiend??? Почему хз.
+    var sTime = shift[a].startTime; // тут и снизу тоже самое. Причем нельзя опускаться в другой цикл. Должно быть откуда достаётся переменная, в том цикле и должно быть. 
+    var eTime = shift[a].endTime;
+
+    var shiftDur = shift[a].endTime - shift[a].startTime;
+
+    var columnShift = datesFixed.findIndex(name => name == sCount);
+    
+
+    var sumLen = summerGer(columnShift, sE).length - 1;
+    
+
+    var sumWHoleShift = summerGer(columnShift, sE)[summerGer(columnShift, sE).length - 1].sum;
+
+    for (j = 0; j < transaction.length; j++) { //Количество транзакций. 
+
+      var tranNum = transaction[j].date.getDate();
+      var tranTime = transaction[j].time;
+
+      //Logger.log("Из этого:" + sCount + "|||" + transaction[j].date.getDate())
+      if (sCount == tranNum) { //Поиск совпадений. Между датой смены и датой транзакции. Считает каждую транзакцию отдельно. 
+      
+        if (sTime <= tranTime && eTime >= tranTime) { //Транзакция находится в диапозоне смены.
+      
+          var countChel = 0;
+          
+          for (k = 0; k < sumLen; k++) { //Сколько человек находилось на смене во время транзакции. 
+            var summerStart = summerGer(columnShift, sE)[k].start;
+            var summerEnd = summerGer(columnShift, sE)[k].end;
+
+            if (summerStart <= tranTime && summerEnd >= tranTime) {
+
+              countChel += 1;
+            }
+            
+          }
+
+          chai += ((Number(transaction[j].sum)*0.9)/countChel) //Сложение всех сумм - 10%. Делёное на количество человек на смене.
+          
+        }
+      }
+    }
+
+    rent += 34*shiftDur/sumWHoleShift;
+    
+  }
+
+  chai = chai - rent.toFixed(2)
+
+  return chai;
+}
